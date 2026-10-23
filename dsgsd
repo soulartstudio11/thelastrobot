@@ -1,0 +1,205 @@
+Farming Robot Website — Complete Feature Explanation
+Your idea is to control your existing Arduino Uno farming robot through a website that works on phones, Windows computers, Ubuntu and tablets. The website sends commands through a hosted backend and a Bluetooth bridge running on a nearby computer.
+
+Here is how each feature is intended to work, including the manual controls, voice commands, sensors, and background operation.
+1. Manual Control
+This section lets you control the robot yourself using on-screen buttons or a computer keyboard.
+Directional control pad
+
+
+Forward
+
+
+
+
+Left
+
+
+Stop
+
+
+Right
+
+
+
+
+Backward
+
+
+
+
+
+Illustration of the manual control layout
+
+What each arrow does
+- Forward (↑): Commands the robot to move forward.
+- Backward (↓): Commands the robot to reverse.
+- Left (←): Commands the robot to turn left.
+- Right (→): Commands the robot to turn right.
+- Stop (■): Sends a stop command to stop the motors.
+On a computer, the arrow keys can control movement. The WASD keys are also supported in the website code: W for forward, A for left, S for backward and D for right. The spacebar or X sends Stop.
+
+On a phone, you press the on-screen buttons.
+
+Hold-to-move behavior: In the current website code, holding a directional button sends the movement command, and releasing it sends Stop. Keyboard movement also sends Stop when the key is released. The Arduino sketch must recognize the same commands for this behavior to work correctly.
+2. Water Control
+This section operates the water pump connected to the robot.
+
+Water ON
+
+Sends the W command to turn the pump on. The Arduino must activate the pump's driver circuit when it receives this command.
+
+
+
+Water OFF
+
+Sends the w command to turn the pump off. The Arduino must switch off the pump driver.
+
+
+
+The pump is controlled manually in this mode. Pressing Water ON does not automatically decide whether the plant needs water. Automatic watering based on soil moisture would be a separate feature.
+3. Soil Moisture Check
+This button is intended to measure the moisture level in the soil near a plant.
+
+The intended sequence is:
+1
+
+Lower the moisture sensor
+
+The robot operates the mechanism that brings the probe into the soil.
+
+
+
+2
+
+Read the sensor
+
+The Arduino reads the soil moisture sensor and sends its result to the website through the Bluetooth connection.
+
+
+
+3
+
+Raise the sensor
+
+The robot lifts the probe out of the soil and returns it to its resting position.
+
+
+
+4
+
+Display the reading
+
+The website shows the moisture result once the Arduino firmware and bridge are configured to provide and interpret that reading.
+
+
+
+An important detail: the website's M command alone cannot physically lower and raise the probe. Your Arduino program needs a suitable actuator and the logic for this sequence. If your current hardware has only a soil probe without a lifting mechanism, that mechanism must be added or the sequence adjusted.
+
+The website currently forwards raw BLE notifications to its activity log; it does not yet convert an arbitrary sensor response into a calibrated moisture percentage.
+4. Voice Control
+Voice control lets you speak commands instead of pressing buttons.
+
+The website listens through the device's microphone after you tap Start listening. It attempts to recognize the command and send the corresponding robot command.
+Spoken command	Intended action
+“Forward”	Move forward
+“Backward”	Reverse
+“Left”	Turn left
+“Right”	Turn right
+“Stop” or “Halt”	Stop the motors
+“Water on”	Start the pump
+“Water off”	Stop the pump
+“Moisture check”	Run the moisture-check sequence
+
+Start and Stop Listening
+- Start listening: Requests microphone access and starts speech recognition.
+- Stop listening: Stops the voice-recognition loop.
+The website code attempts to restart recognition when it ends unexpectedly, so it can continue listening. Browser support, microphone permissions, internet access for speech recognition, and device behavior can affect this.
+
+For safety, voice control should only accept clear, recognized commands. In a noisy environment, test it with the robot's wheels lifted and the pump disconnected.
+5. System Status
+The System section helps you understand which part of the connection is working.
+Backend status
+
+Indicates whether the hosted website/backend can respond to status requests.
+
+
+Bridge computer status
+
+Shows whether the Python bridge is connected to the backend. It does not, by itself, prove that Bluetooth is connected.
+
+
+Robot Bluetooth status
+
+Reports whether the bridge has established a Bluetooth connection to the robot.
+
+
+Last command and update
+
+Shows the most recent command recorded by the backend and the timestamp of the latest bridge update.
+
+
+
+The current version refreshes status periodically and also uses a WebSocket for live updates. The displayed last command means it was sent toward the bridge; it is not proof that the motors physically moved.
+6. Activity Log
+The Activity section records commands sent from the current browser session, with the time they were sent.
+
+For example:
+- 10:15 — Forward
+- 10:15 — Stop
+- 10:16 — Water ON
+- 10:17 — Moisture check
+You can clear the displayed activity using the Clear button. This is a temporary browser-side log, not a permanent historical database.
+
+The backend also maintains basic current status in memory. The current implementation does not provide a complete persistent command history.
+7. How the Background Backend Works
+This is the most important part of your design.
+Your phone or computer
+
+Opens the website and sends a command
+
+
+Hosted backend on Render
+
+Authenticates the request and relays the command
+
+
+Nearby computer running bridge.py
+
+Remains connected to the backend and robot over BLE
+
+
+Arduino Uno and robot
+
+Receives the command and controls the hardware
+
+
+For example, when you tap Forward:
+1. The website sends the F command to the backend.
+2. The backend verifies your control key.
+3. The backend forwards the command to the connected bridge.
+4. The bridge writes F to the Bluetooth characteristic.
+5. The Arduino receives the command and operates the motors if its firmware supports F.
+What continues when you close the website?
+The backend can continue running on Render even when no browser is open. The bridge can also keep its Bluetooth connection active while its computer remains running.
+
+However, if the bridge computer shuts down, loses internet access, or moves out of Bluetooth range, the backend can no longer send commands to the robot. A hosted backend cannot independently connect to Bluetooth hardware that is physically attached to another device.
+
+Render services on some plans may also sleep or restart, so continuous availability depends on the service plan and configuration.
+8. What is supported now versus what still needs work?
+Feature	Current state
+Responsive website	Implemented
+On-screen movement buttons	Implemented
+Keyboard movement	Implemented
+Water ON/OFF commands	Implemented in website and bridge
+Voice command recognition	Implemented where browser support permits
+Hosted backend relay	Implemented; deployment required
+Bluetooth bridge	Implemented; hardware testing required
+Live BLE notification forwarding	Implemented for raw notifications
+Calibrated soil moisture display	Not yet implemented
+Physical probe lowering/raising	Requires compatible actuator and Arduino logic
+Automatic navigation and plant detection	Not implemented
+Automatic watering based on moisture	Not implemented
+Permanent historical logs	Not implemented
+
+In short: the website provides the user interface, Render handles remote requests, and the nearby computer acts as the Bluetooth link to your existing robot. The Arduino firmware remains responsible for the actual motors, pump and sensor hardware.
